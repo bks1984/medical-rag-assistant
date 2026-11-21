@@ -46,13 +46,13 @@ The project compares three approaches to the same questions:
 |---|---|---|
 | 1 | **Base LLM** | Sends the question straight to `gpt-4o-mini` |
 | 2 | **Prompt engineering** | Adds a "medical research assistant" system prompt |
-| 3 | **RAG** | Retrieves the most relevant manual excerpts and answers **only** from them, with page citations |
+| 3 | **RAG** | Retrieves the most relevant manual excerpts and answers **only** from them, citing chapter and page |
 
 ```mermaid
 flowchart LR
     subgraph Ingestion["Ingestion (run once)"]
         A[Merck Manual PDF] -->|PyMuPDF| B[4,000+ pages]
-        B -->|token splitter<br/>500 tok, 50 overlap| C[~8,900 chunks<br/>+ page metadata]
+        B -->|token splitter<br/>500 tok, 50 overlap| C[~8,250 chunks<br/>+ chapter & page]
         C -->|text-embedding-3-small| D[(Chroma<br/>vector store)]
     end
     subgraph Query["Question answering"]

@@ -13,11 +13,13 @@ class Excerpt:
     page_number: int | None
     manual: str
     chunk_id: str = ""
+    chapter: str = ""
 
     @property
     def label(self) -> str:
         page = f"page {self.page_number}" if self.page_number else "page unknown"
-        return f"{self.manual}, {page}"
+        parts = [self.manual, self.chapter, page] if self.chapter else [self.manual, page]
+        return ", ".join(parts)
 
 
 def get_embeddings(settings: Settings):
@@ -58,6 +60,7 @@ def to_excerpt(doc) -> Excerpt:
         page_number=page,
         manual=meta.get("manual", "Medical manual"),
         chunk_id=meta.get("chunk_id", ""),
+        chapter=meta.get("chapter", ""),
     )
 
 

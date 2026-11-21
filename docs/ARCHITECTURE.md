@@ -7,18 +7,19 @@ This document walks through the pipeline stage by stage. For each stage it names
 | Step | Tool | Setting | Why |
 |---|---|---|---|
 | Load PDF | `PyMuPDFLoader` | one `Document` per page | Fast, accurate text extraction, and it keeps the page index |
+| Clean | `clean_page_text()` | strips the licence watermark and parses the running footer | Removes noise and personal data from every page. Captures the **chapter** and **printed page number** for citations |
 | Chunk | `RecursiveCharacterTextSplitter.from_tiktoken_encoder` | `cl100k_base`, 500 tokens, 50 overlap | Measuring in tokens (not characters) matches the model's limits. The overlap keeps sentences that cross a boundary |
-| Tag | `tag_chunks()` | `page_number` (1-based), `manual`, `chunk_id` | Used for citations and traceability |
+| Tag | `tag_chunks()` | `page_number` (printed page), `chapter`, `manual`, `chunk_id` | Used for citations and traceability |
 | Embed | `OpenAIEmbeddings` | `text-embedding-3-small`, 1,536-dim | Cheap and strong on retrieval |
 | Store | `Chroma` (persisted to `chroma_store/`) | batches of 100, 0.3 s pause | Stays under per-request token limits and rate limits |
 
-The Merck Manual yields about **8,875 chunks** with these settings. Ingestion runs once. Run `scripts/ingest.py` again to rebuild the store with different settings.
+After cleaning, the Merck Manual's 4,104 content pages yield about **8,257 chunks** with these settings. The notebook's 8,875 included the watermark text. Ingestion runs once. Run `scripts/ingest.py` again to rebuild the store with different settings.
 
 ## 2. Retrieval: `medical_rag/retriever.py`
 
 - The persisted store is loaded once and cached.
 - `retrieve(question, k=3)` runs a cosine-similarity search, as in the notebook (`search_type="similarity"`, `k=3`).
-- `format_context()` labels each excerpt as `[Excerpt n | <manual>, page N]`, so the LLM can cite real page numbers. The notebook joined chunks with `". "`, which lost where each one came from.
+- `format_context()` labels each excerpt as `[Excerpt n | <manual>, Chapter X. <title>, page N]`, so the LLM can cite real page numbers. The notebook joined chunks with `". "`, which lost where each one came from.
 
 ## 3. Generation: `medical_rag/rag.py` and `medical_rag/prompts.py`
 
