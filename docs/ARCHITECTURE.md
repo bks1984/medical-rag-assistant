@@ -10,7 +10,7 @@ This document walks through the pipeline stage by stage. For each stage it names
 | Clean | `clean_page_text()` | strips the licence watermark and parses the running footer | Removes noise and personal data from every page. Captures the **chapter** and **printed page number** for citations |
 | Chunk | `RecursiveCharacterTextSplitter.from_tiktoken_encoder` | `cl100k_base`, 500 tokens, 50 overlap | Measuring in tokens (not characters) matches the model's limits. The overlap keeps sentences that cross a boundary |
 | Tag | `tag_chunks()` | `page_number` (printed page), `chapter`, `manual`, `chunk_id` | Used for citations and traceability |
-| Embed | `OpenAIEmbeddings` | `text-embedding-3-small`, 1,536-dim | Cheap and strong on retrieval |
+| Embed | `HuggingFaceEmbeddings` (Groq setup) or `OpenAIEmbeddings` | `BAAI/bge-small-en-v1.5`, 384-dim, run locally; or `text-embedding-3-small`, 1,536-dim | Groq has no embedding API, so a small, strong open model runs on the CPU for free. Each provider gets its own Chroma collection because the vector sizes differ |
 | Store | `Chroma` (persisted to `chroma_store/`) | batches of 100, 0.3 s pause | Stays under per-request token limits and rate limits |
 
 After cleaning, the Merck Manual's 4,104 content pages yield about **8,257 chunks** with these settings. The notebook's 8,875 included the watermark text. Ingestion runs once. Run `scripts/ingest.py` again to rebuild the store with different settings.
@@ -25,7 +25,7 @@ After cleaning, the Merck Manual's 4,104 content pages yield about **8,257 chunk
 
 - **System prompt (`RAG_SYSTEM`)**: the role is "AI clinical assistant", and it must use **only** the context. The output format is fixed (`Answer:` / `Source:`). When the context doesn't cover the question, it must reply exactly "Sorry, this is out of my knowledge base."
 - **User prompt (`RAG_USER_TEMPLATE`)**: `###Context` followed by `###Question`. It is filled with `str.replace`, so braces in the manual text (dosage notation, for example) can't break `str.format`.
-- **Model**: `gpt-4o-mini`, temperature 0 and top-p 0.95, for answers that are deterministic and reproducible.
+- **Model**: `llama-3.3-70b-versatile` on Groq, through its OpenAI-compatible endpoint, or `gpt-4o-mini` on OpenAI. Temperature 0 and top-p 0.95 keep answers deterministic and reproducible. The client retries with back-off to cope with Groq's free-tier rate limits, and any `<think>` reasoning block is removed from the output.
 - **Short-circuits**: an empty question or zero retrieved chunks returns without calling the LLM.
 
 ## 4. Baselines: `medical_rag/llm.py`

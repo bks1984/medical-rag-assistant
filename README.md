@@ -44,22 +44,30 @@ The project compares three approaches to the same questions:
 
 | # | Approach | What it does |
 |---|---|---|
-| 1 | **Base LLM** | Sends the question straight to `gpt-4o-mini` |
+| 1 | **Base LLM** | Sends the question straight to the LLM |
 | 2 | **Prompt engineering** | Adds a "medical research assistant" system prompt |
 | 3 | **RAG** | Retrieves the most relevant manual excerpts and answers **only** from them, citing chapter and page |
+
+**Two provider setups, chosen automatically from the key in `.env`:**
+
+| | Groq (default, free tier) | OpenAI (the notebook's setup) |
+|---|---|---|
+| Chat LLM | `llama-3.3-70b-versatile` on Groq | `gpt-4o-mini` |
+| Embeddings | `BAAI/bge-small-en-v1.5`, run locally (free, no key) | `text-embedding-3-small` |
+| Key needed | `GROQ_API_KEY` | `OPENAI_API_KEY` |
 
 ```mermaid
 flowchart LR
     subgraph Ingestion["Ingestion (run once)"]
-        A[Merck Manual PDF] -->|PyMuPDF| B[4,000+ pages]
+        A[Merck Manual PDF] -->|PyMuPDF + watermark/footer cleanup| B[4,104 pages]
         B -->|token splitter<br/>500 tok, 50 overlap| C[~8,250 chunks<br/>+ chapter & page]
-        C -->|text-embedding-3-small| D[(Chroma<br/>vector store)]
+        C -->|bge-small local<br/>or OpenAI embeddings| D[(Chroma<br/>vector store)]
     end
     subgraph Query["Question answering"]
         Q[Clinician question] -->|embed| R{Top-k<br/>similarity search}
         D --> R
         R -->|3 labelled excerpts| P[Grounded prompt<br/>system + context + question]
-        P -->|gpt-4o-mini, temp 0| ANS[Answer + Source pages]
+        P -->|Llama 3.3 70B on Groq<br/>or gpt-4o-mini, temp 0| ANS[Answer + chapter/page citation]
     end
     subgraph Eval["Evaluation"]
         ANS --> J[LLM-as-a-judge]
@@ -120,7 +128,7 @@ medical-rag-assistant/
 ├── medical_rag/              # Core package
 │   ├── config.py             # Settings (env-overridable) + the 4 use-case questions
 │   ├── prompts.py            # System/user prompts for prompt-eng, RAG and the judges
-│   ├── llm.py                # OpenAI client; base LLM + prompt-engineered answers
+│   ├── llm.py                # Groq/OpenAI chat client; base LLM + prompt-engineered answers
 │   ├── ingest.py             # PDF -> chunks -> embeddings -> Chroma
 │   ├── retriever.py          # Load store, top-k search, labelled context
 │   ├── rag.py                # Retrieve + generate grounded, cited answer
@@ -144,7 +152,7 @@ medical-rag-assistant/
 
 ### Prerequisites
 - Python 3.11–3.13
-- An OpenAI API key, or a key for an OpenAI-compatible gateway
+- A **Groq API key** (free at https://console.groq.com/keys), or an OpenAI API key
 - The Merck Manual PDF (see [data/README.md](data/README.md))
 
 ### Setup (Windows PowerShell)
@@ -155,7 +163,7 @@ cd medical-rag-assistant
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy .env.example .env      # then add OPENAI_API_KEY
+copy .env.example .env      # then add GROQ_API_KEY (or OPENAI_API_KEY)
 ```
 
 macOS and Linux: run `source .venv/bin/activate` and `cp .env.example .env`.
@@ -198,14 +206,16 @@ The tests run offline: they mock the LLM and the vector store.
 
 ### Configuration
 
-All settings live in `.env`. See [.env.example](.env.example). The main ones are `CHAT_MODEL`,
-`EMBEDDING_MODEL`, `CHUNK_SIZE`, `CHUNK_OVERLAP`, `TOP_K` and `OPENAI_BASE_URL`, which lets you use a proxy.
+All settings live in `.env`. See [.env.example](.env.example). The provider is detected from the key you set, or you can force it with `LLM_PROVIDER=groq|openai`. Other settings include `CHAT_MODEL`,
+`EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `CHUNK_SIZE`, `CHUNK_OVERLAP` and `TOP_K`.
+
+With Groq, the first ingest downloads the ~130 MB embedding model and embeds the manual on your CPU. This takes a few minutes and costs nothing.
 
 ---
 
 ## 6. Tech stack
 
-Python · OpenAI (`gpt-4o-mini`, `text-embedding-3-small`) · LangChain · ChromaDB · PyMuPDF · tiktoken · Streamlit · pandas · pytest
+Python · Groq (`llama-3.3-70b-versatile`) or OpenAI (`gpt-4o-mini`) · sentence-transformers (`bge-small-en-v1.5`) · LangChain · ChromaDB · PyMuPDF · tiktoken · Streamlit · pandas · pytest
 
 ---
 

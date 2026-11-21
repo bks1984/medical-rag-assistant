@@ -5,6 +5,7 @@ covered by `chat()`. The client is created lazily so importing this module never
 """
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 
 from .config import Settings, get_settings
@@ -18,16 +19,25 @@ class MissingAPIKeyError(RuntimeError):
 def _client(api_key: str, base_url: str | None):
     from openai import OpenAI
 
-    return OpenAI(api_key=api_key, base_url=base_url)
+    # Generous retries: Groq's free tier has low tokens-per-minute limits, and the client
+    # backs off using the server's retry-after header.
+    return OpenAI(api_key=api_key, base_url=base_url, max_retries=8)
 
 
 def get_client(settings: Settings | None = None):
     settings = settings or get_settings()
-    if not settings.openai_api_key:
-        raise MissingAPIKeyError(
-            "OPENAI_API_KEY is not set. Copy .env.example to .env and add your key."
-        )
-    return _client(settings.openai_api_key, settings.openai_base_url)
+    if not settings.api_key:
+        key_name = "GROQ_API_KEY" if settings.llm_provider == "groq" else "OPENAI_API_KEY"
+        raise MissingAPIKeyError(f"{key_name} is not set. Copy .env.example to .env and add your key.")
+    return _client(settings.api_key, settings.base_url)
+
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def strip_reasoning(text: str) -> str:
+    """Some Groq-hosted reasoning models (e.g. Qwen) prepend <think>...</think>; drop it."""
+    return _THINK_RE.sub("", text or "").strip()
 
 
 def chat(
@@ -54,7 +64,7 @@ def chat(
         temperature=settings.temperature if temperature is None else temperature,
         top_p=settings.top_p if top_p is None else top_p,
     )
-    return (completion.choices[0].message.content or "").strip()
+    return strip_reasoning(completion.choices[0].message.content)
 
 
 def ask_llm(question: str, settings: Settings | None = None) -> str:

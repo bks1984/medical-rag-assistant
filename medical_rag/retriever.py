@@ -22,13 +22,24 @@ class Excerpt:
         return ", ".join(parts)
 
 
+@lru_cache(maxsize=2)
 def get_embeddings(settings: Settings):
-    from langchain_openai import OpenAIEmbeddings
+    if settings.embedding_provider == "huggingface":
+        # Runs locally on CPU; the model (~130 MB) downloads on first use.
+        from langchain_huggingface import HuggingFaceEmbeddings
 
-    kwargs = {"model": settings.embedding_model, "api_key": settings.openai_api_key}
-    if settings.openai_base_url:
-        kwargs["base_url"] = settings.openai_base_url
-    return OpenAIEmbeddings(**kwargs)
+        return HuggingFaceEmbeddings(
+            model_name=settings.embedding_model,
+            encode_kwargs={"normalize_embeddings": True},
+        )
+    if settings.embedding_provider == "openai":
+        from langchain_openai import OpenAIEmbeddings
+
+        kwargs = {"model": settings.embedding_model, "api_key": settings.openai_api_key}
+        if settings.llm_provider == "openai" and settings.base_url:
+            kwargs["base_url"] = settings.base_url
+        return OpenAIEmbeddings(**kwargs)
+    raise ValueError(f"EMBEDDING_PROVIDER must be 'huggingface' or 'openai', got {settings.embedding_provider!r}")
 
 
 @lru_cache(maxsize=4)

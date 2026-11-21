@@ -153,5 +153,31 @@ def test_env_overrides(monkeypatch):
     assert s.chunk_size == 900 and s.top_k == 5
 
 
+def test_groq_only_key_selects_groq_with_local_embeddings(monkeypatch):
+    for name in ("LLM_PROVIDER", "OPENAI_API_KEY", "CHAT_MODEL", "EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "COLLECTION_NAME"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
+    s = get_settings()
+    assert s.llm_provider == "groq" and s.api_key == "test-groq-key"
+    assert s.base_url == "https://api.groq.com/openai/v1"
+    assert s.embedding_provider == "huggingface" and s.embedding_model == "BAAI/bge-small-en-v1.5"
+    assert s.collection_name == "merck_manual_huggingface"
+
+
+def test_openai_key_selects_openai(monkeypatch):
+    for name in ("LLM_PROVIDER", "GROQ_API_KEY", "CHAT_MODEL", "EMBEDDING_PROVIDER", "EMBEDDING_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    s = get_settings()
+    assert s.llm_provider == "openai" and s.chat_model == "gpt-4o-mini"
+    assert s.embedding_provider == "openai"
+
+
+def test_strip_reasoning():
+    from medical_rag.llm import strip_reasoning
+
+    assert strip_reasoning("<think>hmm\nok</think>\nAnswer:\nX") == "Answer:\nX"
+
+
 def test_four_use_case_questions():
     assert set(SAMPLE_QUESTIONS) == {"Critical Care", "General Surgery", "Dermatology", "Neurology"}

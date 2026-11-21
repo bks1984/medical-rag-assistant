@@ -128,7 +128,8 @@ def build_vectorstore(
     for start, batch in batched(chunks, settings.embed_batch_size):
         store.add_documents(batch, ids=[d.metadata["chunk_id"] for d in batch])
         progress(f"  embedded {min(start + len(batch), len(chunks))}/{len(chunks)}")
-        time.sleep(0.3)
+        if settings.embedding_provider == "openai":
+            time.sleep(0.3)  # soften API rate limiting; local embeddings need no pause
 
     progress(f"Vector store saved to {settings.chroma_dir}")
     return store

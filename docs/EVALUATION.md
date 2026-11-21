@@ -34,7 +34,7 @@ Each of the four use-case questions was answered three ways: by the base LLM, wi
 |---|---|---|
 | Scores were read with `reply[-2]`, the second-to-last *character* | NaN whenever the judge's reply didn't end in `N}`. This explains the missing values above | `parse_score()` uses a regex on `groundedness_score: N`, with a fallback |
 | Prompt-eng Q4 was scored with `questions[2]` and `responses[2]` | The neurology score was really a second dermatology score | Each answer is paired with its own question in a loop |
-| The judge model was `gpt-3.5-turbo` (retired) | Weaker and inconsistent rating | `JUDGE_MODEL` defaults to `gpt-4o-mini` and can be configured |
+| The judge model was `gpt-3.5-turbo` (retired) | Weaker and inconsistent rating | `JUDGE_MODEL` defaults to the chat model (Llama 3.3 70B on Groq, `gpt-4o-mini` on OpenAI) and can be configured |
 | Context was joined with `". "` and had no source labels | The model could not cite pages reliably | Excerpts are labelled `[Excerpt n | manual, page N]` |
 
 Run `python scripts/evaluate.py` to reproduce the scores with these fixes.
