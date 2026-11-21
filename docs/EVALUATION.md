@@ -9,6 +9,23 @@ Each of the four use-case questions was answered three ways: by the base LLM, wi
 | **Groundedness** | The answer is derived only from the retrieved manual context |
 | **Relevance** | The answer covers all the important aspects of the question, and only those |
 
+## Results from this codebase (Groq)
+
+Setup: `openai/gpt-oss-120b` on Groq (reasoning effort low) for answers and judging, `BAAI/bge-small-en-v1.5` local embeddings, 500/50-token chunks, k = 3. The full answers are in [evaluation_results_groq.csv](evaluation_results_groq.csv).
+
+| Question | Base: G / R | Prompt-eng: G / R | RAG: G / R |
+|---|---|---|---|
+| Sepsis (Critical Care) | 2 / 5 | 2 / 5 | **5 / 5** |
+| Appendicitis (Surgery) | 2 / 5 | 2 / 5 | **5 / 5** |
+| Patchy hair loss (Dermatology) | 2 / 5 | 2 / 5 | **5 / 5** |
+| Brain injury (Neurology) | 1 / 5 | 1 / 5 | **5** / 4 |
+| **Mean** | **1.75 / 5.00** | **1.75 / 5.00** | **5.00 / 4.75** |
+
+Every score was parsed. There are no blanks, unlike the notebook.
+
+- **Groundedness separates the approaches sharply.** Answers without retrieval are relevant and read well, but they are not supported by the manual. RAG answers are fully grounded and cite the chapter and printed page, for example *Chapter 227, Sepsis & Septic Shock, pp. 2444–2445* and *Chapter 11, pp. 164–165* for appendicitis.
+- **Neurology relevance was 4.** The answer covered rehabilitation from Ch. 324 and Ch. 350 but not acute management (ICP control, surgery), because 2 of the 3 retrieved excerpts were rehab-focused. Retrieving more candidates (k = 8) and re-ranking them should fix this. See *Next experiments* below.
+
 ## Notebook results
 
 | Question | Base: G / R | Prompt-eng: G / R | RAG: G / R |
@@ -34,7 +51,7 @@ Each of the four use-case questions was answered three ways: by the base LLM, wi
 |---|---|---|
 | Scores were read with `reply[-2]`, the second-to-last *character* | NaN whenever the judge's reply didn't end in `N}`. This explains the missing values above | `parse_score()` uses a regex on `groundedness_score: N`, with a fallback |
 | Prompt-eng Q4 was scored with `questions[2]` and `responses[2]` | The neurology score was really a second dermatology score | Each answer is paired with its own question in a loop |
-| The judge model was `gpt-3.5-turbo` (retired) | Weaker and inconsistent rating | `JUDGE_MODEL` defaults to the chat model (Llama 3.3 70B on Groq, `gpt-4o-mini` on OpenAI) and can be configured |
+| The judge model was `gpt-3.5-turbo` (retired) | Weaker and inconsistent rating | `JUDGE_MODEL` defaults to the chat model (gpt-oss-120b on Groq, `gpt-4o-mini` on OpenAI) and can be configured |
 | Context was joined with `". "` and had no source labels | The model could not cite pages reliably | Excerpts are labelled `[Excerpt n | manual, page N]` |
 
 Run `python scripts/evaluate.py` to reproduce the scores with these fixes.

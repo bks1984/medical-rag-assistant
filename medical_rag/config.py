@@ -30,8 +30,12 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 # Per-provider defaults. Groq serves an OpenAI-compatible chat API but no embedding models,
 # so with Groq the embeddings run locally with sentence-transformers (free, no key).
 _PROVIDER_DEFAULTS = {
-    "groq": {"chat_model": "llama-3.3-70b-versatile", "embedding_provider": "huggingface"},
-    "openai": {"chat_model": "gpt-4o-mini", "embedding_provider": "openai"},
+    # gpt-oss-120b is a reasoning model: its hidden reasoning counts toward max_tokens,
+    # so it gets a larger budget and low reasoning effort.
+    "groq": {"chat_model": "openai/gpt-oss-120b", "embedding_provider": "huggingface",
+             "max_tokens": "2048", "reasoning_effort": "low"},
+    "openai": {"chat_model": "gpt-4o-mini", "embedding_provider": "openai",
+               "max_tokens": "512", "reasoning_effort": ""},
 }
 _EMBEDDING_DEFAULTS = {
     "huggingface": "BAAI/bge-small-en-v1.5",
@@ -77,7 +81,9 @@ class Settings:
     openai_api_key: str = field(default_factory=lambda: _env("OPENAI_API_KEY", ""))  # only for OpenAI embeddings
 
     # --- Generation ----------------------------------------------------------
-    max_tokens: int = field(default_factory=lambda: int(_env("MAX_TOKENS", "512")))
+    max_tokens: int = field(default_factory=lambda: int(_env("MAX_TOKENS", _provider_default("max_tokens"))))
+    # For reasoning models (gpt-oss: low|medium|high, qwen3: none|default). Empty = don't send.
+    reasoning_effort: str = field(default_factory=lambda: os.getenv("REASONING_EFFORT", _provider_default("reasoning_effort")))
     temperature: float = field(default_factory=lambda: float(_env("TEMPERATURE", "0")))
     top_p: float = field(default_factory=lambda: float(_env("TOP_P", "0.95")))
 

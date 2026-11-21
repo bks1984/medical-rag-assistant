@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+if hasattr(sys.stdout, "reconfigure"):  # Windows consoles default to cp1252
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from medical_rag.llm import ask_llm, ask_with_prompt_engineering  # noqa: E402
 from medical_rag.rag import DISCLAIMER, answer_question  # noqa: E402

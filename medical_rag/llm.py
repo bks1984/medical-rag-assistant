@@ -57,12 +57,15 @@ def chat(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": user_prompt})
 
+    extra = {"reasoning_effort": settings.reasoning_effort} if settings.reasoning_effort else {}
     completion = get_client(settings).chat.completions.create(
         model=model or settings.chat_model,
         messages=messages,
-        max_tokens=max_tokens or settings.max_tokens,
+        # never go below the provider default: reasoning models need room before answering
+        max_tokens=max(max_tokens or 0, settings.max_tokens),
         temperature=settings.temperature if temperature is None else temperature,
         top_p=settings.top_p if top_p is None else top_p,
+        **extra,
     )
     return strip_reasoning(completion.choices[0].message.content)
 

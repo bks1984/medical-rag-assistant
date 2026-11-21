@@ -52,7 +52,7 @@ The project compares three approaches to the same questions:
 
 | | Groq (default, free tier) | OpenAI (the notebook's setup) |
 |---|---|---|
-| Chat LLM | `llama-3.3-70b-versatile` on Groq | `gpt-4o-mini` |
+| Chat LLM | `openai/gpt-oss-120b` on Groq (reasoning effort: low) | `gpt-4o-mini` |
 | Embeddings | `BAAI/bge-small-en-v1.5`, run locally (free, no key) | `text-embedding-3-small` |
 | Key needed | `GROQ_API_KEY` | `OPENAI_API_KEY` |
 
@@ -67,7 +67,7 @@ flowchart LR
         Q[Clinician question] -->|embed| R{Top-k<br/>similarity search}
         D --> R
         R -->|3 labelled excerpts| P[Grounded prompt<br/>system + context + question]
-        P -->|Llama 3.3 70B on Groq<br/>or gpt-4o-mini, temp 0| ANS[Answer + chapter/page citation]
+        P -->|gpt-oss-120b on Groq<br/>or gpt-4o-mini, temp 0| ANS[Answer + chapter/page citation]
     end
     subgraph Eval["Evaluation"]
         ANS --> J[LLM-as-a-judge]
@@ -81,32 +81,45 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a component-by-component e
 
 ## 3. Results
 
-From the notebook run (4 questions, LLM-as-a-judge, scores from 1 to 5):
+LLM-as-a-judge scores from 1 to 5, averaged over the 4 use-case questions.
+
+**This codebase** (Groq `gpt-oss-120b` + local `bge-small` embeddings, fixed evaluation, `python scripts/evaluate.py`):
+
+| Approach | Groundedness | Relevance |
+|---|---|---|
+| Base LLM | 1.75 | 5.00 |
+| Prompt engineering | 1.75 | 5.00 |
+| **RAG** | **5.00** | 4.75 |
+
+**Original notebook** (OpenAI `gpt-4o-mini`, judge `gpt-3.5-turbo`):
 
 | Approach | Groundedness | Relevance |
 |---|---|---|
 | Base LLM | 5.00* | 3.67 |
 | Prompt engineering | 4.25 | 4.50 |
-| **RAG** | **4.50** | **5.00** |
+| RAG | 4.50 | 5.00 |
 
-\*The base LLM's perfect groundedness is misleading. It gives correct-sounding medical reasoning that is
-*not* drawn from the manual, and some judge replies could not be parsed. Both problems are fixed in this
-codebase (see [docs/EVALUATION.md](docs/EVALUATION.md)).
+\*The notebook's scores came from a flawed evaluation. Scores were read from the second-to-last
+character of the judge's reply, so several came out blank, and one answer was scored against the wrong
+question. Once fixed, the result is much clearer: answers without retrieval sound right but are **not
+supported by the manual** (groundedness 1.75), while RAG answers are fully grounded (5.0). See
+[docs/EVALUATION.md](docs/EVALUATION.md) for per-question scores.
 
-**Example RAG answer** (General Surgery):
+**Example RAG answer** (General Surgery, from this codebase):
 
-> **Answer:** The common symptoms of appendicitis include epigastric or periumbilical pain followed by
-> nausea, vomiting and anorexia, with pain shifting to the right lower quadrant… Appendicitis cannot be
-> cured via medicine; the treatment is surgical removal, an open or laparoscopic appendectomy.
+> **Answer:** Common symptoms of acute appendicitis include epigastric or periumbilical pain that later shifts
+> to the right lower quadrant, brief nausea, vomiting, anorexia… and classic signs such as tenderness at
+> McBurney's point, Rovsing, psoas and obturator signs. Appendicitis cannot be cured solely with medication;
+> … definitive treatment requires surgical removal of the appendix (appendectomy), open or laparoscopic.
 >
-> **Source:** The Merck Manual of Diagnosis & Therapy, 19th Edition, Ch. 11, Acute Abdomen & Surgical Gastroenterology, p. 163.
+> **Source:** The Merck Manual of Diagnosis & Therapy, Chapter 11. Acute Abdomen & Surgical Gastroenterology, pages 164–165.
 
 ### Key insights
 
-1. **RAG has the best relevance (5.0/5).** Retrieval sends medical queries to the right sections of the manual.
-2. **RAG answers can be traced.** Every answer cites manual pages, which no-retrieval answers cannot do. This is essential for clinical trust.
-3. **Groundedness (4.5) is the main thing to improve.** Small 500-token chunks sometimes split a protocol across chunks, so the model fills gaps.
-4. **Prompt engineering alone helps relevance (3.67 → 4.5)** but adds no evidence.
+1. **RAG is the only approach grounded in the evidence (5.0 vs 1.75).** Answers without retrieval are fluent and relevant, but not traceable to the manual, which makes them unsafe for clinical decisions.
+2. **RAG answers can be traced.** Every answer cites the chapter and printed page, so a clinician can verify it in seconds.
+3. **Relevance is limited by retrieval.** The neurology answer (4/5) covered rehabilitation but missed acute brain-injury management, because 2 of the 3 retrieved excerpts were about rehab. Fetching more candidates and re-ranking them would fix this.
+4. **Prompt engineering alone adds no evidence.** It changes tone and structure, not where the facts come from.
 
 ### Business recommendations
 
@@ -215,7 +228,7 @@ With Groq, the first ingest downloads the ~130 MB embedding model and embeds the
 
 ## 6. Tech stack
 
-Python · Groq (`llama-3.3-70b-versatile`) or OpenAI (`gpt-4o-mini`) · sentence-transformers (`bge-small-en-v1.5`) · LangChain · ChromaDB · PyMuPDF · tiktoken · Streamlit · pandas · pytest
+Python · Groq (`openai/gpt-oss-120b`) or OpenAI (`gpt-4o-mini`) · sentence-transformers (`bge-small-en-v1.5`) · LangChain · ChromaDB · PyMuPDF · tiktoken · Streamlit · pandas · pytest
 
 ---
 

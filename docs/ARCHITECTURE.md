@@ -25,7 +25,7 @@ After cleaning, the Merck Manual's 4,104 content pages yield about **8,257 chunk
 
 - **System prompt (`RAG_SYSTEM`)**: the role is "AI clinical assistant", and it must use **only** the context. The output format is fixed (`Answer:` / `Source:`). When the context doesn't cover the question, it must reply exactly "Sorry, this is out of my knowledge base."
 - **User prompt (`RAG_USER_TEMPLATE`)**: `###Context` followed by `###Question`. It is filled with `str.replace`, so braces in the manual text (dosage notation, for example) can't break `str.format`.
-- **Model**: `llama-3.3-70b-versatile` on Groq, through its OpenAI-compatible endpoint, or `gpt-4o-mini` on OpenAI. Temperature 0 and top-p 0.95 keep answers deterministic and reproducible. The client retries with back-off to cope with Groq's free-tier rate limits, and any `<think>` reasoning block is removed from the output.
+- **Model**: `openai/gpt-oss-120b` on Groq (reasoning effort: low), through its OpenAI-compatible endpoint, or `gpt-4o-mini` on OpenAI. Temperature 0 and top-p 0.95 keep answers deterministic and reproducible. The client retries with back-off to cope with Groq's free-tier rate limits, and any `<think>` reasoning block is removed from the output.
 - **Short-circuits**: an empty question or zero retrieved chunks returns without calling the LLM.
 
 ## 4. Baselines: `medical_rag/llm.py`
